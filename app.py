@@ -23,7 +23,6 @@ j = r.json()
 
 maindf = pd.DataFrame(create_data(j))
 st.title("COVID Tracker")
-st.dataframe(maindf)
 
 col1, col2 = st.beta_columns(2)
 
@@ -52,7 +51,7 @@ if country:
 
     d_range = pd.date_range(start=sd,end=ed)
 
-    r1 = requests.get(f"https://covid-api.mmediagroup.fr/v1/history?country={country}&status=deaths")
+    r1 = requests.get(f"https://covid-api.mmediagroup.fr/v1/history?country={country}&status=confirmed")
     
     hist = dict(r1.json()["All"]["dates"])
     history = {}
@@ -69,7 +68,7 @@ if country:
     st.write(get_line_chart(confirmeddf, "#ff0000", "Date", "Confirmed"))
 
 
-    r1 = requests.get(f"https://covid-api.mmediagroup.fr/v1/history?country={country}&status=confirmed")
+    r1 = requests.get(f"https://covid-api.mmediagroup.fr/v1/history?country={country}&status=deaths")
     hist = dict(r1.json()["All"]["dates"])
     history = {}
     

@@ -1,11 +1,9 @@
 import altair as alt
 
 def get_line_chart(df, line_color, xcol, ycol):
-    # df = df.rename(columns={xcol: "x", ycol: "y"})
-
     # The basic line
     line = alt.Chart(df).mark_line(interpolate="basis").encode(
-        x=xcol,
+        x=alt.X(xcol, axis=alt.Axis(tickCount=5)),
         y=ycol,
         color=alt.value(line_color),
         tooltip=[xcol, ycol]
