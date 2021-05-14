@@ -3,6 +3,7 @@ import pandas as pd
 import requests, datetime
 import altair as alt
 import numpy as np
+import pydeck as pdk
 
 from util import get_line_chart
 
@@ -82,3 +83,41 @@ if country:
 
     st.subheader(f"Number of deaths in {country}")
     st.write(get_line_chart(deaddf, "gray", "Date", "Deaths"))
+
+    r = requests.get(f"https://covid-api.mmediagroup.fr/v1/cases?country={country}")
+    j = r.json()
+    del j["All"]
+
+    data = {"State": [], "Latitude": [], "Longitude": [], "Confirmed": [], "Recovered": [], "Deaths": [], "UpdateDateTime": []}
+
+    for state in j:
+        data["State"].append(state)
+        data["Latitude"].append(j[state]['lat'])
+        data["Longitude"].append(j[state]['long'])
+        data["Confirmed"].append(j[state]['confirmed'])
+        data["Recovered"].append(j[state]['recovered'])
+        data["Deaths"].append(j[state]['deaths'])
+        data["UpdateDateTime"].append(j[state]['updated'])
+
+    df = pd.DataFrame(data)
+    df.set_index("State", inplace=True)
+    df["UpdateDateTime"] = pd.to_datetime(df["UpdateDateTime"]).dt.date
+    try:
+        df.drop(["Unknown"], inplace=True)
+    except:
+        pass
+
+    if data["State"] != []:
+        st.header("State-wise analysis")
+
+        latlongdf = df.reset_index().rename(columns={"Longitude": "lon", "Latitude":"lat"})[['lat', 'lon']]
+        latlongdf["lat"] = pd.to_numeric(latlongdf["lat"], errors='coerce')
+        latlongdf["lon"] = pd.to_numeric(latlongdf["lon"], errors='coerce')
+        
+        st.subheader(f"Map of {country}")
+        st.map(latlongdf)
+
+        st.subheader("Cases state wise")
+        st.bar_chart(df[["Confirmed", "Recovered"]], height=500)
+        st.subheader("Deaths state wise")
+        st.bar_chart(df[["Deaths"]], height=500)
