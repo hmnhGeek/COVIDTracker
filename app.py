@@ -8,6 +8,7 @@ import pydeck as pdk
 from util import get_line_chart
 
 sidebar = st.sidebar
+sidebar.title("Sidebar panel")
 
 def create_data(json):
     data = []
@@ -25,19 +26,100 @@ j = r.json()
 maindf = pd.DataFrame(create_data(j))
 st.title("COVID Tracker")
 
+st.markdown(
+    """Welcome to the COVID Tracker web application. This page allows you to analyse worldwide spread
+        of the coronavirus. Here, you can find information about **number cases, deaths and recovered** for all
+        countries in the world, plus, you could find information about the **vaccination drive**. 
+        This application is created by ***Himanshu Sharma***. Visit https://github.com/hmnhGeek for more projects.
+    """
+)
+
 col1, col2 = st.beta_columns(2)
+col11, col22 = st.beta_columns(2)
 
 col1.subheader("Top 10 in confirmed cases")
-col1.bar_chart(maindf[["country", "confirmed"]].set_index("country").sort_values("confirmed").drop("Global").tail(10))
+top_confirmed = maindf[["country", "confirmed"]].set_index("country").sort_values("confirmed").drop("Global").tail(10)
+col1.write(alt.Chart(top_confirmed.reset_index()).mark_bar().encode(
+    x=alt.X('country:O', sort=None),
+    y='confirmed:Q',
+    tooltip=["country", "confirmed"]
+).interactive())
+
 col2.subheader("Top 10 in deaths")
-col2.bar_chart(maindf[["country", "deaths"]].set_index("country").sort_values("deaths").drop("Global").tail(10))
+top_deaths = maindf[["country", "deaths"]].set_index("country").sort_values("deaths").drop("Global").tail(10)
+col2.write(alt.Chart(top_deaths.reset_index()).mark_bar().encode(
+    x=alt.X('country:O', sort=None),
+    y='deaths:Q',
+    tooltip=["country", "deaths"]
+).interactive())
+
+col11.subheader("Lowest 10 in confirmed cases")
+low_confirmed = maindf[["country", "confirmed"]].set_index("country").sort_values("confirmed").drop("Global").head(10)
+col11.write(alt.Chart(low_confirmed.reset_index()).mark_bar().encode(
+    x=alt.X('country:O', sort=None),
+    y='confirmed:Q',
+    tooltip=["country", "confirmed"]
+).interactive())
+
+col22.subheader("Lowest 10 in deaths")
+low_deaths = maindf[["country", "deaths"]].set_index("country").sort_values("deaths").drop("Global").head(10)
+col22.write(alt.Chart(low_deaths.reset_index()).mark_bar().encode(
+    x=alt.X('country:O', sort=None),
+    y='deaths:Q',
+    tooltip=["country", "deaths"]
+).interactive())
+
+r3 = requests.get("https://covid-api.mmediagroup.fr/v1/vaccines")
+j3 = r3.json()
+
+vaccine_data = {"State": [], "Administered": [], "People Vaccinated": [], "People Partially Vaccinated": [], "Population": []}
+
+for i in j3:
+    vaccine_data["State"].append(i)
+    vaccine_data["Administered"].append(j3[i]["All"]["administered"])
+    vaccine_data["People Vaccinated"].append(j3[i]["All"]["people_vaccinated"])    
+    vaccine_data["People Partially Vaccinated"].append(j3[i]["All"]["people_partially_vaccinated"])   
+    try:
+        vaccine_data["Population"].append(j3[i]["All"]["population"])
+    except:
+        vaccine_data["Population"].append(None)
+
+vaccine_df = pd.DataFrame(vaccine_data)
+st.header("Vaccination data (World)")
+st.dataframe(vaccine_df)
+st.dataframe(vaccine_df.describe())
+
+st.subheader("Top 10 countries in vaccination drive")
+column1, column2, column3 = st.beta_columns(3)
+
+column1.write(alt.Chart(vaccine_df.sort_values(by=["Administered"]).tail(10)).mark_bar().encode(
+    x=alt.X('State:O', sort=None),
+    y=alt.Y("Administered"),
+    tooltip=["State", "Administered"]
+))
+column2.write(alt.Chart(vaccine_df.sort_values(by=["People Vaccinated"]).tail(10)).mark_bar().encode(
+    x=alt.X('State:O', sort=None),
+    y=alt.Y("People Vaccinated"),
+    tooltip=["State", "People Vaccinated"]
+))
+column3.write(alt.Chart(vaccine_df.sort_values(by=["People Partially Vaccinated"]).tail(10)).mark_bar().encode(
+    x=alt.X('State:O', sort=None),
+    y=alt.Y("People Partially Vaccinated"),
+    tooltip=["State", "People Partially Vaccinated"]
+))
+
+st.subheader("Countries with people only partially vaccinated")
+st.dataframe(vaccine_df[(vaccine_df["People Vaccinated"] == 0) & (vaccine_df["People Partially Vaccinated"] != 0)].drop("People Vaccinated", axis=1))
+
 
 country = sidebar.selectbox(
     "Country",
-    maindf["country"].unique()
+    ["None"]+maindf["country"].unique().tolist()
 )
 
-if country:
+if country != "None":
+    st.header(f"Analysis for {country}")
+
     sd = sidebar.date_input(
         "Start Date",
         datetime.datetime.now() - datetime.timedelta(days=7)
@@ -117,7 +199,46 @@ if country:
         st.subheader(f"Map of {country}")
         st.map(latlongdf)
 
-        st.subheader("Cases state wise")
-        st.bar_chart(df[["Confirmed", "Recovered"]], height=500)
-        st.subheader("Deaths state wise")
-        st.bar_chart(df[["Deaths"]], height=500)
+        st.subheader(f"Confirmed cases in states of {country}")
+        st.write(alt.Chart(df[["Confirmed"]].reset_index()).mark_bar().encode(
+            x=alt.X('State', sort=alt.SortField(field="Confirmed", order="descending")),
+            y="Confirmed",
+            tooltip=["State", "Confirmed"]
+        ).properties(width=700, height=500))
+        st.subheader(f"Recovered cases in states of {country}")
+        st.write(alt.Chart(df[["Recovered"]].reset_index()).mark_bar().encode(
+            x=alt.X('State', sort=alt.SortField(field="Recovered", order="descending")),
+            y="Recovered",
+            tooltip=["State", "Recovered"]
+        ).properties(width=700, height=500))
+        st.subheader(f"Deaths in states of {country}")
+        st.write(alt.Chart(df[["Deaths"]].reset_index()).mark_bar().encode(
+            x=alt.X('State', sort=alt.SortField(field="Deaths", order="descending")),
+            y="Deaths",
+            tooltip=["State", "Deaths"]
+        ).properties(width=700, height=500))
+
+        r4 = requests.get(f"https://covid-api.mmediagroup.fr/v1/vaccines?country={country}")
+        j = r4.json()
+
+        try:
+            del j["All"]
+        except: pass
+
+        data = {"State": [], "Administered": []}
+        for i in j:
+            data["State"].append(i)
+            data["Administered"].append(j[i]["administered"])
+
+        vdf = pd.DataFrame(data)
+
+        st.header(f"Vaccination analysis for {country}")
+        st.subheader("Statistical analysis of the data")
+        st.dataframe(vdf.describe().transpose())
+
+        st.subheader(f"Vaccines administered in different states of {country}")
+        st.write(alt.Chart(vdf.sort_values("Administered")).mark_bar().encode(
+            x=alt.X('State', sort=alt.SortField(field="Administered", order="descending")),
+            y=alt.Y("Administered"),
+            tooltip=["State", "Administered"]
+        ).properties(width=700, height=500))
